@@ -1,0 +1,17 @@
+{shop_url}
+
+Hi {firstname} {lastname},
+
+Thank you for shopping at {shop_name}!
+
+Order {order_name} — wire transfer details
+
+Your order has been placed. Below you will find the information required to complete your bank transfer. We will process your order once the payment is received.
+
+{coody_codcard_wire_payment_txt}
+
+Follow your order status in your [Order history]({history_url}).
+
+If you have a guest account, you can track your order on the [Guest tracking]({guest_tracking_url}) page.
+
+[{shop_name}]({shop_url})

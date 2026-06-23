@@ -1,0 +1,17 @@
+{shop_url}
+
+Witaj {firstname} {lastname},
+
+Dziękujemy za zakupy w {shop_name}!
+
+Zamówienie {order_name} — dane do przelewu bankowego
+
+Twoje zamówienie zostało przyjęte. Poniżej znajdziesz dane potrzebne do wykonania przelewu. Realizacja rozpocznie się po zaksięgowaniu wpłaty.
+
+{coody_codcard_wire_payment_txt}
+
+Śledź status zamówienia w [Historii zamówień]({history_url}) w swoim koncie klienta.
+
+Jeśli zakupiłeś jako gość, możesz śledzić zamówienie na stronie [Śledzenie zamówienia]({guest_tracking_url}).
+
+[{shop_name}]({shop_url})

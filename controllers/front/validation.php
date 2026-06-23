@@ -9,7 +9,12 @@ class Coody_CodcardValidationModuleFrontController extends ModuleFrontController
 
     public function postProcess()
     {
-        if (!$this->checkIfContextIsValid() || !$this->checkIfPaymentOptionIsAvailable()) {
+        $paymentType = (string) Tools::getValue('type', Coody_Codcard::PAYMENT_TYPE_CARD);
+        if (!in_array($paymentType, [Coody_Codcard::PAYMENT_TYPE_CARD, Coody_Codcard::PAYMENT_TYPE_WIRE], true)) {
+            $paymentType = Coody_Codcard::PAYMENT_TYPE_CARD;
+        }
+
+        if (!$this->checkIfContextIsValid($paymentType) || !$this->checkIfPaymentOptionIsAvailable()) {
             Tools::redirect($this->context->link->getPageLink(
                 'order',
                 true,
@@ -29,19 +34,41 @@ class Coody_CodcardValidationModuleFrontController extends ModuleFrontController
             ));
         }
 
-        $orderStateId = (int) Configuration::getGlobalValue(Coody_Codcard::CONFIG_OS_CODCARD_VALIDATION);
-        if (!$orderStateId) {
-            $orderStateId = (int) Configuration::get('PS_OS_PREPARATION');
+        $idCurrency = (int) $this->context->cart->id_currency;
+
+        if ($paymentType === Coody_Codcard::PAYMENT_TYPE_WIRE) {
+            if ($this->module->getAccountForCurrency($idCurrency) === '') {
+                Tools::redirect($this->context->link->getPageLink(
+                    'order',
+                    true,
+                    (int) $this->context->language->id,
+                    ['step' => 1]
+                ));
+            }
+
+            $orderStateId = (int) Configuration::getGlobalValue(Coody_Codcard::CONFIG_OS_WIRE_VALIDATION);
+            if (!$orderStateId) {
+                $orderStateId = (int) Configuration::get('PS_OS_BANKWIRE');
+            }
+            $paymentLabel = $this->module->getWirePaymentLabel();
+            $extraVars = $this->module->getValidateOrderExtraVars($idCurrency, Coody_Codcard::PAYMENT_TYPE_WIRE);
+        } else {
+            $orderStateId = (int) Configuration::getGlobalValue(Coody_Codcard::CONFIG_OS_CODCARD_VALIDATION);
+            if (!$orderStateId) {
+                $orderStateId = (int) Configuration::get('PS_OS_PREPARATION');
+            }
+            $paymentLabel = $this->module->getCardPaymentLabel();
+            $extraVars = [];
         }
 
         $this->module->validateOrder(
             (int) $this->context->cart->id,
             $orderStateId,
             (float) $this->context->cart->getOrderTotal(true, Cart::BOTH),
-            $this->module->displayName,
+            $paymentLabel,
             null,
-            [],
-            (int) $this->context->currency->id,
+            $extraVars,
+            $idCurrency,
             false,
             $customer->secure_key
         );
@@ -60,14 +87,27 @@ class Coody_CodcardValidationModuleFrontController extends ModuleFrontController
     }
 
     /**
-     * Sprawdza, czy kontekst jest poprawny (koszyk, klient, adresy, nie-wirtualny).
+     * @param string $paymentType
      */
-    private function checkIfContextIsValid()
+    private function checkIfContextIsValid($paymentType)
     {
-        return Validate::isLoadedObject($this->context->cart)
+        $valid = Validate::isLoadedObject($this->context->cart)
             && Validate::isUnsignedInt($this->context->cart->id_customer)
-            && Validate::isUnsignedInt($this->context->cart->id_address_delivery)
-            && Validate::isUnsignedInt($this->context->cart->id_address_invoice)
+            && Validate::isUnsignedInt($this->context->cart->id_address_invoice);
+
+        if (!$valid) {
+            return false;
+        }
+
+        if ($paymentType === Coody_Codcard::PAYMENT_TYPE_WIRE) {
+            if ($this->context->cart->isVirtualCart()) {
+                return true;
+            }
+
+            return Validate::isUnsignedInt($this->context->cart->id_address_delivery);
+        }
+
+        return Validate::isUnsignedInt($this->context->cart->id_address_delivery)
             && !$this->context->cart->isVirtualCart();
     }
 
