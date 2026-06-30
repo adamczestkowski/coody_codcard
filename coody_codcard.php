@@ -69,7 +69,7 @@ class Coody_Codcard extends PaymentModule
         $this->name = 'coody_codcard';
         $this->tab = 'payments_gateways';
         $this->author = 'Coody';
-        $this->version = '1.3.1';
+        $this->version = '1.3.2';
         $this->need_instance = 1;
         $this->ps_versions_compliancy = ['min' => '1.7.0.0', 'max' => _PS_VERSION_];
         $this->controllers = ['validation'];
