@@ -1,0 +1,78 @@
+name: Release
+
+# Tworzy GitHub Release + tag, gdy w coody_codcard.php zmieni się $this->version.
+# Do release dołącza gotową do instalacji na PrestaShop paczkę coody_codcard.zip
+# (zip zawiera folder coody_codcard/ bez .git i .github).
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'coody_codcard.php'
+  workflow_dispatch:        # ręczne uruchomienie z zakładki Actions
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # pełna historia + tagi
+
+      - name: Odczytaj wersję z coody_codcard.php
+        id: ver
+        run: |
+          VERSION=$(grep -oE "this->version[[:space:]]*=[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+'" coody_codcard.php | grep -oE "[0-9]+\.[0-9]+\.[0-9]+" | head -n1)
+          if [ -z "$VERSION" ]; then echo "❌ Nie znaleziono wersji w coody_codcard.php"; exit 1; fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Wykryta wersja: $VERSION"
+
+      - name: Sprawdź czy tag już istnieje
+        id: check
+        run: |
+          if git rev-parse "${{ steps.ver.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "ℹ️ Tag ${{ steps.ver.outputs.version }} już istnieje — pomijam release."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build paczki coody_codcard.zip
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          rm -rf build
+          mkdir -p build/coody_codcard
+          rsync -a \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'build' \
+            --exclude 'node_modules' \
+            --exclude '.gitignore' \
+            ./ build/coody_codcard/
+          (cd build && zip -rq coody_codcard.zip coody_codcard)
+          echo "Zawartość paczki (top-level):"
+          unzip -l build/coody_codcard.zip | head -40
+
+      - name: Guard — brak plików konfliktowych w paczce
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          bad=$(unzip -Z1 build/coody_codcard.zip | grep -Ei '(^|/)\.git/|(^|/)\.github/|node_modules' || true)
+          if [ -n "$bad" ]; then
+            echo "❌ Paczka zawiera pliki dev/konfliktowe:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "✅ Paczka czysta — gotowa do instalacji na PrestaShop."
+
+      - name: Utwórz tag i GitHub Release
+        if: steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.version }}
+          name: coody_codcard ${{ steps.ver.outputs.version }}
+          generate_release_notes: true
+          files: build/coody_codcard.zip
